@@ -77,7 +77,7 @@ def ignore?(params)
   end
 
   if params.dig(0, 'source').include?(ENV['TWITTER_APP_NAME_TO_TWEET_MASTODON_STATUSES'])
-    puts 'TWEET SKIPPED. Reason: tweet from Aepyornis!'
+    puts "TWEET SKIPPED. Reason: tweet from #{ENV['TWITTER_APP_NAME_TO_TWEET_MASTODON_STATUSES']}!"
     pp params.dig(0, 'source')
     pp ENV['TWITTER_APP_NAME_TO_TWEET_MASTODON_STATUSES']
 
@@ -88,7 +88,7 @@ def ignore?(params)
 end
 
 def pretty_text(params)
-  # loooooooooooooooooooong tw ... => loooooooooooooooooooong tweet!
+  # loooooooooooooooooooong tw ... => loooooooooooooooooooong tweeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeet!
   # or, normal tweet!
   text = params.dig(0, 'extended_tweet', 'full_text') || params.dig(0, 'text')
 
