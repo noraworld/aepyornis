@@ -68,14 +68,6 @@ def ignore?(params)
     return true
   end
 
-  if params.dig(0, 'retweeted_status', 'user', 'id_str') && params.dig(0, 'retweeted_status', 'user', 'id_str') != params.dig(0, 'user', 'id_str')
-    puts 'TWEET SKIPPED. Reason: retweet!'
-    pp params.dig(0, 'retweeted_status', 'user', 'id_str')
-    pp params.dig(0, 'user', 'id_str')
-
-    return true
-  end
-
   if params.dig(0, 'source').include?(ENV['TWITTER_APP_NAME_TO_TWEET_MASTODON_STATUSES'])
     puts "TWEET SKIPPED. Reason: tweet from #{ENV['TWITTER_APP_NAME_TO_TWEET_MASTODON_STATUSES']}!"
     pp params.dig(0, 'source')
@@ -97,8 +89,20 @@ def pretty_text(params)
     text.gsub!(url['url'], url['expanded_url'])
   end
 
+  # Retweet without my comment: replace text with retweeted tweet URL only
+  if params.dig(0, 'retweeted_status', 'user', 'id_str') && params.dig(0, 'retweeted_status', 'user', 'id_str') != params.dig(0, 'user', 'id_str')
+    text = "https://twitter.com/i/web/status/#{params.dig(0, 'retweeted_status', 'id_str')}"
+
+    # MEMO: This does not work properly because retweeted tweet URL does not become to be contained when my comment contains other URL
+    # text = params.dig(0, 'retweeted_status', 'entities', 'urls', 0, 'expanded_url')
+  end
+
+  # Retweet with my comment: my comment + retweeted tweet URL
   if params.dig(0, 'quoted_status_permalink')
-    text = "#{text}\n\n#{params.dig(0, 'quoted_status_permalink', 'expanded')}"
+    text = "#{text}\n\nhttps://twitter.com/i/web/status/#{params.dig(0, 'quoted_status', 'id_str')}"
+
+    # MEMO: This does not work properly because retweeted tweet URL does not become to be contained when my comment contains other URL
+    # text = "#{text}\n\n#{params.dig(0, 'quoted_status', 'entities', 'urls', 0, 'expanded_url')}"
   end
 
   # trim image shorten URL (https://t.co/foo as image URL)
