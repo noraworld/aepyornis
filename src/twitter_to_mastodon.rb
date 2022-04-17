@@ -2,6 +2,7 @@
 
 require 'bundler/setup'
 require 'faraday'
+require 'logger'
 require 'open-uri'
 require 'sinatra'
 require 'sinatra/reloader' if settings.development?
@@ -10,8 +11,11 @@ require_relative 'sample_tweets_hash.rb' if settings.development?
 Bundler.require
 Dotenv.load
 
+logger = Logger.new('logs/debug.log', 'monthly')
+
 post '/' do
   params = settings.production? ? JSON.parse(request.body.read) : mock_params
+  logger.debug(params)
 
   return if ignore?(params)
 
@@ -24,7 +28,7 @@ post '/' do
     builder.adapter :net_http
   end
 
-  twimgs = params.dig(0, 'extended_entities', 'media')&.map do |medium|
+  twimgs = (params.dig(0, 'extended_tweet', 'extended_entities', 'media') || params.dig(0, 'extended_entities', 'media'))&.map do |medium|
     ext = File.extname(medium['media_url_https'])
     "#{medium['media_url_https'].chomp(ext)}?format=#{ext.delete('.')}&name=large"
   end
@@ -32,9 +36,9 @@ post '/' do
   media_ids = twimgs&.map&.with_index do |path, index|
     # https://stackoverflow.com/questions/56392828/path-name-contains-null-byte-for-image-url-while-existing
     t = Tempfile.new
-    puts "(#{index + 1}/#{twimgs.count}) Download image from Twitter..."
+    logger.debug("(#{index + 1}/#{twimgs.count}) Download image from Twitter...")
     t.write(open(path).read)
-    puts "(#{index + 1}/#{twimgs.count}) Download complete!"
+    logger.debug("(#{index + 1}/#{twimgs.count}) Download complete!")
     t.close
 
     payload = {
@@ -55,23 +59,23 @@ post '/' do
   }
 
   conn.post '/api/v1/statuses', payload
-  puts "Tooted successfully!!!\n\n"
+  logger.debug("Tooted successfully!!!\n\n")
 end
 
 def ignore?(params)
   if params[0]['in_reply_to_user_id_str'] != params[0]['user']['id_str'] && /^@/ =~ params[0]['text']
-    puts 'TWEET SKIPPED. Reason: reply to someone!'
-    pp params[0]['in_reply_to_user_id_str']
-    pp params[0]['user']['id_str']
-    pp params[0]['text']
+    logger.debug('TWEET SKIPPED. Reason: reply to someone!')
+    logger.debug(params[0]['in_reply_to_user_id_str'])
+    logger.debug(params[0]['user']['id_str'])
+    logger.debug(params[0]['text'])
 
     return true
   end
 
   if params.dig(0, 'source').include?(ENV['TWITTER_APP_NAME_TO_TWEET_MASTODON_STATUSES'])
-    puts "TWEET SKIPPED. Reason: tweet from #{ENV['TWITTER_APP_NAME_TO_TWEET_MASTODON_STATUSES']}!"
-    pp params.dig(0, 'source')
-    pp ENV['TWITTER_APP_NAME_TO_TWEET_MASTODON_STATUSES']
+    logger.debug("TWEET SKIPPED. Reason: tweet from #{ENV['TWITTER_APP_NAME_TO_TWEET_MASTODON_STATUSES']}!")
+    logger.debug(params.dig(0, 'source'))
+    logger.debug(ENV['TWITTER_APP_NAME_TO_TWEET_MASTODON_STATUSES'])
 
     return true
   end
@@ -85,7 +89,7 @@ def pretty_text(params)
   text = params.dig(0, 'extended_tweet', 'full_text') || params.dig(0, 'text')
 
   # https://t.co/foo => https://www.example.com
-  params.dig(0, 'entities', 'urls')&.each do |url|
+  (params.dig(0, 'extended_tweet', 'entities', 'urls') || params.dig(0, 'entities', 'urls'))&.each do |url|
     text.gsub!(url['url'], url['expanded_url'])
   end
 
